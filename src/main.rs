@@ -12,16 +12,23 @@ struct PlayerSlider;
 struct EnemySlider;
 
 #[derive(Component)]
-struct Ball {
-    velocity: Vec3,
-    size: Vec2,
-}
-
-#[derive(Component)]
 enum Collider {
     EnemyScore,
     PlayerScore,
     Solid,
+}
+
+#[derive(Component)]
+enum Directon {
+    Left,
+    Right,
+}
+
+#[derive(Component)]
+struct Ball {
+    velocity: Vec3,
+    size: Vec2,
+    directon: Directon,
 }
 
 fn main() {
@@ -101,7 +108,8 @@ fn setup(mut commands: Commands) {
         ))
         .insert(Ball {
             velocity: 700.0 * Vec3::new(0.5, -0.5, 0.0).normalize(),
-            size: Vec2::new(20., 20.),
+            size: Vec2::new(30., 30.),
+            directon: Directon::Right,
         });
 
     // spawn walls
@@ -201,29 +209,45 @@ fn enemy_move(
         (With<Sprite>, With<EnemySlider>, Without<PlayerSlider>),
     >,
     ball_query: Query<
-        &Transform,
-        (
-            With<Ball>,
-            Without<Slider>,
-            Without<PlayerSlider>,
-            Without<EnemySlider>,
-        ),
+        (&Transform, &Ball),
+        (Without<Slider>, Without<PlayerSlider>, Without<EnemySlider>),
     >,
 ) {
     for mut enemy_transform in enemy_query.iter_mut() {
-        for ball_transform in ball_query.iter() {
-            if ball_transform.translation.y > enemy_transform.translation.y {
-                // if ball is above enemy platform
-                if enemy_transform.translation.y < 310.0 {
-                    // if enemy can go further up
-                    enemy_transform.translation.y += 350.0 * time.delta_seconds();
+        for (ball_transform, ball) in ball_query.iter() {
+            match ball.directon {
+                Directon::Left => {
+                    if enemy_transform.translation.y > 0.0 {
+                        // if enemy is over the center
+                        if enemy_transform.translation.y > -310.0 {
+                            // if enemy can go further down
+                            enemy_transform.translation.y -= 350.0 * time.delta_seconds();
+                        }
+                    }
+
+                    if enemy_transform.translation.y < 0.0 {
+                        // if enemy is under the center
+                        if enemy_transform.translation.y < 310.0 {
+                            // if enemy can go further up
+                            enemy_transform.translation.y += 350.0 * time.delta_seconds();
+                        }
+                    }
                 }
-            }
-            if ball_transform.translation.y < enemy_transform.translation.y {
-                // if ball is beneth enemy platform
-                if enemy_transform.translation.y > -310.0 {
-                    // if enemy can go further down
-                    enemy_transform.translation.y -= 350.0 * time.delta_seconds();
+                Directon::Right => {
+                    if ball_transform.translation.y > enemy_transform.translation.y {
+                        // if ball is above enemy platform
+                        if enemy_transform.translation.y < 310.0 {
+                            // if enemy can go further up
+                            enemy_transform.translation.y += 350.0 * time.delta_seconds();
+                        }
+                    }
+                    if ball_transform.translation.y < enemy_transform.translation.y {
+                        // if ball is beneth enemy platform
+                        if enemy_transform.translation.y > -310.0 {
+                            // if enemy can go further down
+                            enemy_transform.translation.y -= 350.0 * time.delta_seconds();
+                        }
+                    }
                 }
             }
         }
@@ -269,6 +293,7 @@ fn collsion_system(
                     Collision::Left => {
                         if velocity.x > 0.0 {
                             velocity.x = -velocity.x;
+                            ball.directon = Directon::Left;
                             ball_transform.translation.x = collision_transform.translation.x
                                 - collision_sprite.custom_size.unwrap().x / 2.0
                                 - ball_size.x / 2.0;
@@ -277,6 +302,7 @@ fn collsion_system(
                     Collision::Right => {
                         if velocity.x < 0.0 {
                             velocity.x = -velocity.x;
+                            ball.directon = Directon::Right;
                             ball_transform.translation.x = collision_transform.translation.x
                                 + collision_sprite.custom_size.unwrap().x / 2.0
                                 + ball_size.x / 2.0;
@@ -304,7 +330,6 @@ fn collsion_system(
                         }
                     }
                 }
-
                 break;
             }
         }
